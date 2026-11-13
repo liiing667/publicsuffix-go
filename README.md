@@ -124,9 +124,9 @@ publicsuffix.DomainFromListWithOptions(list, "google.blogspot.com", nil)
 
 IDNA-aware applications generally use the A-label form for storing and manipulating data, whereas the U-labels can appear in presentation and user interface forms.
 
-Although the PSL list has been traditionally U-label encoded, this library follows the common industry standards and stores the rules in their A-label form. Therefore, unless explicitly mentioned, any method call, comparison or internal representation is expected to be ASCII-compatible encoded (ACE).
+Although the PSL list has been traditionally U-label encoded, this library follows the common industry standards and stores the rules in their A-label form. Therefore, unless explicitly mentioned, any internal representation is ASCII-compatible encoded (ACE).
 
-Passing Unicode names to the library may either result in error or unexpected behaviors.
+Domain names passed to the high-level lookup methods (such as `Domain`, `Parse`, `Normalize`, and the `cookiejar` adapter) are normalized before the lookup: the name is lowercased, a single trailing dot is removed, and U-labels (Unicode) are converted to A-labels (punycode). Invalid names are rejected.
 
 If you are interested in the details of this decision, you can read the full discussion [here](https://github.com/weppos/publicsuffix-go/issues/31).
 

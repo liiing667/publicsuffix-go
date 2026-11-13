@@ -23,6 +23,12 @@ func TestValid(t *testing.T) {
 
 		{"foo.blogspot.com", "foo.blogspot.com", &DomainName{"blogspot.com", "foo", "", MustNewRule("blogspot.com")}},
 		{"bar.foo.blogspot.com", "foo.blogspot.com", &DomainName{"blogspot.com", "foo", "bar", MustNewRule("blogspot.com")}},
+
+		{"EXAMPLE.COM", "example.com", &DomainName{"com", "example", "", MustNewRule("com")}},
+		{"example.com.", "example.com", &DomainName{"com", "example", "", MustNewRule("com")}},
+		{"FOO.Example.Com.", "example.com", &DomainName{"com", "example", "foo", MustNewRule("com")}},
+		{"example.рф", "example.xn--p1ai", &DomainName{"xn--p1ai", "example", "", MustNewRule("xn--p1ai")}},
+		{"foo.example.рф.", "example.xn--p1ai", &DomainName{"xn--p1ai", "example", "foo", MustNewRule("xn--p1ai")}},
 	}
 
 	for _, testCase := range testCases {
@@ -116,23 +122,19 @@ func TestIDNA(t *testing.T) {
 		}
 	}
 
-	// These tests validates the non-acceptance of U-labels.
-	//
-	// TODO(weppos): some tests are passing because of the default rule *
-	// Consider to add some tests overriding the default rule to nil.
-	// Right now, setting the default rule to nil with cause a panic if the lookup results in a nil.
+	// These tests validates that U-labels are normalized to A-labels
+	// before the lookup, and therefore match the ASCII-encoded rules.
 	testUCases := []idnaTestCase{
-		// U-labels are NOT supported
 		// Check single IDN part
 		{"рф", "", true},
-		{"example.рф", "example.рф", false},           // passes because of *
-		{"subdomain.example.рф", "example.рф", false}, // passes because of *
+		{"example.рф", "example.xn--p1ai", false},
+		{"subdomain.example.рф", "example.xn--p1ai", false},
 		// Check multiple IDN parts
-		{"example-упр.рф", "example-упр.рф", false},           // passes because of *
-		{"subdomain.example-упр.рф", "example-упр.рф", false}, // passes because of *
+		{"example-упр.рф", "xn--example--3bhk5a.xn--p1ai", false},
+		{"subdomain.example-упр.рф", "xn--example--3bhk5a.xn--p1ai", false},
 		// Check multiple IDN rules
-		{"example.упр.срб", "упр.срб", false},
-		{"sudbomain.example.упр.срб", "упр.срб", false},
+		{"example.упр.срб", "example.xn--o1ach.xn--90a3ac", false},
+		{"sudbomain.example.упр.срб", "example.xn--o1ach.xn--90a3ac", false},
 	}
 
 	for _, testCase := range testUCases {

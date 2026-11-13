@@ -20,13 +20,27 @@ func PublicSuffix(domain string) (publicSuffix string, icann bool) {
 	//
 	//return d.Rule.Value, !d.Rule.Private
 
-	rule := psl.DefaultList.Find(domain, nil)
-	publicSuffix = rule.Decompose(domain)[1]
+	name, err := psl.Normalize(domain)
+	if err != nil {
+		// Fail closed: an invalid domain is treated as its own public suffix,
+		// so that cookiejar rejects cookies scoped to it.
+		return domain, false
+	}
+
+	rule := psl.DefaultList.Find(name, nil)
+	publicSuffix = rule.Decompose(name)[1]
 	icann = !rule.Private
 
 	// x/net/publicsuffix sets icann to false when the default rule "*" is used
 	if rule.Value == "" && rule.Type == psl.WildcardType {
 		icann = false
+	}
+
+	if publicSuffix == "" {
+		// Fail closed: the domain is itself a public suffix or cannot be
+		// attributed to any rule. Return it unchanged so that cookiejar
+		// rejects cookies scoped to it.
+		publicSuffix = name
 	}
 
 	return

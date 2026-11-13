@@ -54,3 +54,48 @@ func TestEffectiveTLDPlusOne(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicSuffixNormalization(t *testing.T) {
+	testCases := []struct {
+		input  string
+		suffix string
+		icann  bool
+	}{
+		// mixed case and trailing dot are normalized
+		{"WWW.EXAMPLE.COM", "com", true},
+		{"www.example.com.", "com", true},
+		{"Example.CO.UK.", "co.uk", true},
+		// U-labels are normalized to A-labels
+		{"example.рф", "xn--p1ai", true},
+		{"sub.example.公司.cn", "xn--55qx5d.cn", true},
+		// fail closed: the domain is itself a public suffix
+		{"com", "com", true},
+		{"blogspot.com", "blogspot.com", false},
+		// fail closed: invalid domains are returned unchanged
+		{".example.com", ".example.com", false},
+	}
+
+	for _, testCase := range testCases {
+		suffix, icann := wpsl.PublicSuffix(testCase.input)
+		if suffix != testCase.suffix || icann != testCase.icann {
+			t.Errorf("PublicSuffix(%v) = (%v, %v), want (%v, %v)", testCase.input, suffix, icann, testCase.suffix, testCase.icann)
+		}
+	}
+}
+
+func TestEffectiveTLDPlusOneNormalization(t *testing.T) {
+	testCases := map[string]string{
+		"WWW.EXAMPLE.COM":   "example.com",
+		"www.example.com.":  "example.com",
+		"example.рф":        "example.xn--p1ai",
+		"sub.example.公司.cn": "example.xn--55qx5d.cn",
+	}
+
+	for input, want := range testCases {
+		if got, err := wpsl.EffectiveTLDPlusOne(input); err != nil {
+			t.Errorf("EffectiveTLDPlusOne(%v) returned error: %v", input, err)
+		} else if got != want {
+			t.Errorf("EffectiveTLDPlusOne(%v) = %v, want %v", input, got, want)
+		}
+	}
+}

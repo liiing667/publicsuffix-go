@@ -442,7 +442,7 @@ func DomainFromListWithOptions(l *List, name string, options *FindOptions) (stri
 //	publicsuffix.ParseFromListWithOptions(list, "www.example.co.uk")
 //	// &DomainName{"co.uk", "example"}
 func ParseFromListWithOptions(l *List, name string, options *FindOptions) (*DomainName, error) {
-	n, err := normalize(name)
+	n, err := Normalize(name)
 	if err != nil {
 		return nil, err
 	}
@@ -471,14 +471,31 @@ func ParseFromListWithOptions(l *List, name string, options *FindOptions) (*Doma
 	return dn, nil
 }
 
-func normalize(name string) (string, error) {
+// Normalize normalizes a domain name so that it can be looked up in the list.
+//
+// The name is lowercased, a single trailing dot (the DNS root label) is removed,
+// and U-labels (Unicode) are converted to A-labels (punycode) so that IDN input
+// matches the ASCII-encoded rules stored in the list.
+//
+// It returns an error if the name is blank, starts with a dot,
+// or cannot be converted to ASCII.
+func Normalize(name string) (string, error) {
 	ret := strings.ToLower(name)
+
+	// An FQDN may end with a single trailing dot representing the root label.
+	// Strip it so that "example.com." is treated the same as "example.com".
+	ret = strings.TrimSuffix(ret, ".")
 
 	if ret == "" {
 		return "", fmt.Errorf("name is blank")
 	}
 	if ret[0] == '.' {
 		return "", fmt.Errorf("name %s starts with a dot", ret)
+	}
+
+	ret, err := ToASCII(ret)
+	if err != nil {
+		return "", err
 	}
 
 	return ret, nil
@@ -529,8 +546,20 @@ type cookiejarList struct {
 
 // PublicSuffix implements cookiejar.PublicSuffixList.
 func (l cookiejarList) PublicSuffix(domain string) string {
-	rule := l.List.Find(domain, nil)
-	return rule.Decompose(domain)[1]
+	name, err := Normalize(domain)
+	if err != nil {
+		// Fail closed: an invalid domain is treated as its own public suffix,
+		// so that cookiejar rejects cookies scoped to it.
+		return domain
+	}
+	rule := l.List.Find(name, nil)
+	if suffix := rule.Decompose(name)[1]; suffix != "" {
+		return suffix
+	}
+	// Fail closed: the domain is itself a public suffix or cannot be
+	// attributed to any rule. Return it unchanged so that cookiejar
+	// rejects cookies scoped to it.
+	return name
 }
 
 // PublicSuffix implements cookiejar.String.

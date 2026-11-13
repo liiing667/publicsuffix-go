@@ -508,11 +508,68 @@ func TestCookieJarList(t *testing.T) {
 		"www.parliament.uk":        "uk",
 		// not listed
 		"www.example.test": "test",
+		// mixed case and trailing dot are normalized
+		"WWW.EXAMPLE.COM":  "com",
+		"www.example.com.": "com",
+		"Example.CO.UK.":   "co.uk",
+		// U-labels are normalized to A-labels
+		"example.рф":        "xn--p1ai",
+		"www.example.рф.":   "xn--p1ai",
+		"example.xn--p1ai":  "xn--p1ai",
+		"example.упр.срб":   "xn--o1ach.xn--90a3ac",
+		"sub.example.公司.cn": "xn--55qx5d.cn",
+		// fail closed: the domain is itself a public suffix
+		"com":          "com",
+		"blogspot.com": "blogspot.com",
+		"xn--p1ai":     "xn--p1ai",
+		// fail closed: the domain cannot be attributed to any rule
+		"localhost": "localhost",
+		// fail closed: invalid domains are returned unchanged
+		"":             "",
+		".":            ".",
+		".example.com": ".example.com",
 	}
 
 	for input, suffix := range testCases {
 		if output := CookieJarList.PublicSuffix(input); output != suffix {
 			t.Errorf("CookieJarList.PublicSuffix(%v) = %v, want %v", input, output, suffix)
+		}
+	}
+}
+
+func TestNormalize(t *testing.T) {
+	testCases := map[string]string{
+		"example.com":     "example.com",
+		"EXAMPLE.COM":     "example.com",
+		"WwW.Example.Com": "www.example.com",
+		// a single trailing dot (the DNS root label) is removed
+		"example.com.": "example.com",
+		"EXAMPLE.COM.": "example.com",
+		"xn--p1ai.":    "xn--p1ai",
+		// U-labels are converted to A-labels
+		"example.рф":    "example.xn--p1ai",
+		"example.рф.":   "example.xn--p1ai",
+		"example.公司.cn": "example.xn--55qx5d.cn",
+	}
+
+	for input, want := range testCases {
+		if got, err := Normalize(input); err != nil {
+			t.Errorf("Normalize(%v) returned error: %v", input, err)
+		} else if got != want {
+			t.Errorf("Normalize(%v) = %v, want %v", input, got, want)
+		}
+	}
+
+	errorCases := []string{
+		"",
+		".",
+		".example.com",
+		"..example.com",
+	}
+
+	for _, input := range errorCases {
+		if got, err := Normalize(input); err == nil {
+			t.Errorf("Normalize(%v) should have returned error, got: %v", input, got)
 		}
 	}
 }
